@@ -412,11 +412,23 @@ class FeatureConnector(object):
       tensor_data: Tensor or dictionary of tensor, output of the tf.data.Dataset
         object
     """
-    # Note: This all works fine in Eager mode (without tf.function) because
-    # tf.data pipelines are always executed in Graph mode.
-
-    # Apply the decoding to each of the individual distributed features.
-    return tf.map_fn(
+    if None in self.shape[1:] and tfexample_data.shape[0] is None:
+    # Length and shape unknown, should deal with length == 0 case
+    # as (0, None, None, 3) isn't supported by tf.map_fn
+      zero_shape = (0 if s is None else s for s in self.shape)
+      return tf.cond(
+        tf.math.equal(tf.shape(tfexample_data),0),
+        lambda: tf.constant(zero_shape,shape=(0, 0, 0, self.shape[-1]), dtype=self.dtype),
+        lambda: tf.map_fn(
+          self.decode_example,
+          tfexample_data,
+          fn_output_signature=self.dtype,
+          parallel_iterations=10,
+          back_prop=False,
+          name='sequence_decode')
+      )
+    else:  # Shape statically defined
+      return tf.map_fn(
         self.decode_example,
         tfexample_data,
         fn_output_signature=self.dtype,
@@ -424,6 +436,19 @@ class FeatureConnector(object):
         back_prop=False,
         name='sequence_decode',
     )
+
+    # Note: This all works fine in Eager mode (without tf.function) because
+    # tf.data pipelines are always executed in Graph mode.
+
+    # Apply the decoding to each of the individual distributed features.
+    # return tf.map_fn(
+    #     self.decode_example,
+    #     tfexample_data,
+    #     fn_output_signature=self.dtype,
+    #     parallel_iterations=10,
+    #     back_prop=False,
+    #     name='sequence_decode',
+    # )
 
   def decode_ragged_example(self, tfexample_data):
     """Decode nested features from a tf.RaggedTensor.

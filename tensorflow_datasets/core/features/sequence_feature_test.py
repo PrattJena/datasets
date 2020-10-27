@@ -19,6 +19,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_datasets import testing
 from tensorflow_datasets.core import features as feature_lib
+import tensorflow_datasets as tfds
 
 tf.enable_v2_behavior()
 
@@ -447,6 +448,18 @@ class SequenceDictFeatureTest(testing.FeatureExpectationsTestCase):
             ),
         ],
     )
+    self.assertFeature(
+        feature=feature_lib.Sequence(tfds.features.Image(shape=(None, None, 3))),
+        shape=(None, None, None, 3),
+        dtype=tf.uint8,
+        tests=[
+            testing.FeatureExpectationItem(
+                value=[],
+                expected=[],
+        ),
+      ],
+    )
+
 
   # Should add unittest for _transpose_dict_list
 
